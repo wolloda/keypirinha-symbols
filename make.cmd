@@ -1,7 +1,7 @@
 @echo off
 setlocal
 
-set PACKAGE_NAME=symbols
+set PACKAGE_NAME=Symbols
 set INSTALL_DIR=%APPDATA%\Keypirinha\InstalledPackages
 
 if "%1"=="" goto help

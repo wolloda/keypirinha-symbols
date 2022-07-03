@@ -1,8 +1,17 @@
 # Keypirinha launcher (keypirinha.com)
 
+from enum import Enum
+
 import keypirinha as kp
 import keypirinha_util as kpu
 import keypirinha_net as kpnet
+
+from .symbols_list import SymbolList
+
+
+class SuggestionType(Enum):
+    SYMBOL = 1
+    EMOJI = 2
 
 class Symbols(kp.Plugin):
     """
@@ -32,19 +41,59 @@ class Symbols(kp.Plugin):
     More detailed documentation at: http://keypirinha.com/api/plugin.html
     """
 
+    ACTION_COPY = "copy"
+    FIND_SYMBOLS_TARGET = "find_symbols"
+    FIND_EMOJI_TARGET = "find_emoji"
+
     def __init__(self):
         super().__init__()
+        self._debug = True
 
     def on_start(self):
-        pass
+        self._read_config()
+
     def on_catalog(self):
-        pass
+        catalog = [
+            self.create_item(
+                category=kp.ItemCategory.KEYWORD,
+                label="Symbols",
+                short_desc="Find UNICODE symbol",
+                target=self.FIND_SYMBOLS_TARGET,
+                args_hint=kp.ItemArgsHint.REQUIRED,
+                hit_hint=kp.ItemHitHint.KEEPALL
+            ),
+            # self.create_item(
+            #     category=kp.ItemCategory.KEYWORD,
+            #     label="Emoji",
+            #     short_desc="Find emoji",
+            #     target=self.FIND_EMOJI_TARGET,
+            #     args_hint=kp.ItemArgsHint.REQUIRED,
+            #     hit_hint=kp.ItemHitHint.KEEPALL
+            # )
+        ]
+        self.set_catalog(catalog)
 
     def on_suggest(self, user_input, items_chain):
-        pass
+        if not user_input or not items_chain:
+            return
+
+        suggestions = []
+
+        if items_chain[-1].target() == self.FIND_SYMBOLS_TARGET:
+            suggestions = self._create_suggestions(SuggestionType.SYMBOL)
+        elif items_chain[-1].target() == self.FIND_EMOJI_TARGET:
+            suggestions = self._create_suggestions(SuggestionType.EMOJI)
+
+        self.set_suggestions(suggestions)
+        self._create_actions()
 
     def on_execute(self, item, action):
-        pass
+        if item.category() != kp.ItemCategory.KEYWORD:
+            return
+
+        if not action or action.name() == self.ACTION_COPY:
+            kpu.set_clipboard(item.short_desc())
+            return
 
     def on_activated(self):
         pass
@@ -53,4 +102,39 @@ class Symbols(kp.Plugin):
         pass
 
     def on_events(self, flags):
-        pass
+        self._read_config()
+
+    def _create_actions(self):
+        actions = [
+            self.create_action(name=self.ACTION_COPY,
+                               label="Copy symbol",
+                               short_desc="Copy symbol to clipboard"),
+        ]
+        self.set_actions(kp.ItemCategory.KEYWORD, actions)
+
+    def _read_config(self):
+        settings = self.load_settings()
+
+    def _create_suggestions(self, suggestion_type: SuggestionType):
+        suggestions = []
+
+        source = {}
+        if suggestion_type == SuggestionType.SYMBOL:
+            source = SymbolList.symbols
+        elif suggestion_type == SuggestionType.EMOJI:
+            source = SymbolList.emoji
+
+        for entry in source.keys():
+            if len(entry) != 1:
+                continue
+
+            suggestions.append(self.create_item(
+                category=kp.ItemCategory.KEYWORD,
+                label=source[entry],
+                short_desc=entry,
+                target=source[entry],
+                args_hint=kp.ItemArgsHint.FORBIDDEN,
+                hit_hint=kp.ItemHitHint.IGNORE
+            ))
+
+        return suggestions
